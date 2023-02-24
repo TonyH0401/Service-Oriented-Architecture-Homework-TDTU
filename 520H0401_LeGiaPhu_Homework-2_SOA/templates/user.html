@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}
+My Flask App - {{ name }}
+{% endblock %}
+
+{% block page_content %}
+<div style="margin-top: 20px; margin-bottom: 50px;">
+    <h1>Hello, {{ name }}</h1>
+    <a href="{{ url_for('user', name='john') }}">Check the URL</a><br>
+    <a href="{{ url_for('user', name='anthony', page='2', number='10') }}">Check the query</a><br>
+
+    {% block page %}
+        <h1>{{ page }}</h1>
+    {% endblock %}
+        
+    {% block number %}
+        <h1>{{ number }}</h1>
+    {% endblock %}
+
+</div>
+
+{% endblock %}
+
+    <!-- this is not allowed because there are no value called name that the url_for can send to route function user -->
+    <!-- <a href="{{ url_for('user', number='10') }}">Check the query</a> --> 
