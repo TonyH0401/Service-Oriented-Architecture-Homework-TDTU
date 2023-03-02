@@ -4,9 +4,9 @@ from flask import Flask, flash, redirect, render_template, session, request, url
 from flask_bootstrap import Bootstrap4
 from flask_moment import Moment
 import pytz
-from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, EmailField, DateField, SelectField, PasswordField
-from wtforms.validators import DataRequired, Email
+from flask_wtf import FlaskForm, RecaptchaField
+from wtforms import StringField, SubmitField, EmailField, DateField, SelectField, PasswordField, RadioField
+from wtforms.validators import DataRequired
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
@@ -22,6 +22,15 @@ bootstrap = Bootstrap4(app)
 moment = Moment(app)
 
 
+# ex4
+RECAPTCHA_PUBLIC_KEY = "6LdIpMckAAAAACigFCbhjZdQHiZjMJkYLmJl7WVL"
+RECAPTCHA_PRIVATE_KEY = "6LdIpMckAAAAAAoct_UBlrXGgBoqedANVWCpWFdq"
+app.config['RECAPTCHA_USE_SSL'] = False
+app.config['RECAPTCHA_PUBLIC_KEY'] = "6LdIpMckAAAAACigFCbhjZdQHiZjMJkYLmJl7WVL"
+app.config['RECAPTCHA_PRIVATE_KEY'] = "6LdIpMckAAAAAAoct_UBlrXGgBoqedANVWCpWFdq"
+app.config['RECAPTCHA_OPTIONS'] = {'theme': 'white'}
+
+
 class Role(db.Model):
     __tablename__ = 'roles'
     id = db.Column(db.Integer, primary_key=True)
@@ -32,6 +41,7 @@ class Role(db.Model):
     # 2nd parameter is the class name of the parent (ie: role)
     users = db.relationship('User', backref='role')
 
+    # this is what will be displayed in the flask shell with the command Role.query.all()
     def __repr__(self):
         return '<Role %r>' % self.name
 
@@ -47,6 +57,7 @@ class User(db.Model):
         return '<User %r>' % self.username
 
 
+# ex2
 class Account(db.Model):
     __tablename__ = 'accounts'
     id = db.Column(db.Integer, primary_key=True)
@@ -67,7 +78,6 @@ class Gender(db.Model):
 
     def __repr__(self):
         return '<Gender %r>' % self.name
-
 class NameForm2(FlaskForm):
     name = StringField('What is your name?', validators=[DataRequired()])
     # the validators Email() does not work, but EmailField does
@@ -77,7 +87,8 @@ class NameForm2(FlaskForm):
     nationality = StringField("What is your nationality?", validators=[DataRequired()])
     # gender = SelectField("Select:", choices=[(0, "male"), (1, "female"), (2, "none")], validate_choice=True)
     gender = SelectField("Select:", choices=[], validate_choice=True)
-
+    tos = RadioField("Accept terms of service: ", choices=[(0, "Accept")], validators=[DataRequired()])
+    
     submit = SubmitField('Submit')
 
 
@@ -92,6 +103,42 @@ class NameForm(FlaskForm):
     # petname = StringField('What is your petname?', validators=[DataRequired()])
     # the submit button
     submit = SubmitField('Submit')
+
+
+# ex4
+class SignupForm(FlaskForm):
+    username  = StringField("What is your name?", validators=[DataRequired()])
+    recaptcha = RecaptchaField()
+# the flow is: dir /recapchaindex is 1st (the form is always None) => create the form = SignupForm()
+# username gets from the session.get("username"), the session exists always and throughout the session website
+# after that, it render_template with all the values: form, username,...
+# when you use method post in the .html file, it call the function route add_comment
+# in def add_comment it does the normal stuff from previous exercise, but with session username value
+# after that, it redirect url_for to def recapchaindex
+# and the cycle begin again but now with a username value from the session
+# the recapcha part is defined in the SignupForm and it is called in the .html file as form.recapcha
+@app.route("/recapchaindex")
+def recapchaindex(form=None):
+    if form is None:
+        form = SignupForm()
+    username = session.get("username")
+    known = session.get('known')
+    return render_template("recapchaindex.html", form=form, username=username, known=known, current_time=datetime.utcnow())
+@app.route("/add/", methods=("POST",))
+def add_comment():
+    form = SignupForm()
+    if form.validate_on_submit():
+        current_user = User.query.filter_by(username=form.username.data).first()
+        if current_user is None:
+            session["known"] = False
+            session["username"] = None
+            flash("You are new!?")
+        else:
+            username = form.username.data
+            session['known'] = True
+            session["username"] = username
+        return redirect(url_for("recapchaindex"))
+    return recapchaindex(form)
 
 
 # the "/" route has 2 http methods "get" and "post" (it is "get" by default)
@@ -131,6 +178,7 @@ def index():
             current_user = User(username=form.name.data)
             db.session.add(current_user)
             db.session.commit()
+            # this is a session variable, it goes all the way and throughout the website
             session['known'] = False
         # if user exist in db
         else:
@@ -172,8 +220,8 @@ def getdate(region_code, city_code):
     return render_template('ex4.html', number=4, current_time=current_time)
 
 
-@app.route("/account", methods=["GET", "POST"])
-def account():
+@app.route("/account/register", methods=["GET", "POST"])
+def account_register():
     name = None
     email = None
     password = None
@@ -210,19 +258,21 @@ def account():
                 db.session.add(current_account)
                 db.session.add(current_user)
                 db.session.commit()
+                flash('Success!')
                 session['known'] = False
             else:
-                flash('Looks like you existed!')
+                flash('Looks like your name existed!')
                 session['known'] = True
         else:
             print("existed")
-            flash('Looks like you existed!')
+            flash('Looks like your email existed!')
             session['known'] = True
         session['name'] = form.name.data
         return redirect(url_for('index'))
     # print(name, email, password, dob, nationality, gender)
     # GET methods will return render_templates
     return render_template('register.html', form=form, current_time=datetime.utcnow())
+
 
 # ------------------------------------------------------------------------------------------------
 

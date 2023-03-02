@@ -1,56 +1,149 @@
-run in cmd always
-the command in powershell is weird
-set FLASK_APP=hello.py
-set FLASK_DEBUG=1
-flask run
+Follow closely every steps in: https://cs504070.duonghuuphuc.com/lesson-03/lesson-3a.html
 
-there is something abnout flask
-https://www.digitalocean.com/community/tutorials/how-to-use-templates-in-a-flask-application
-https://marketplace.visualstudio.com/items?itemName=noxiz.jinja-snippets
+Create a database, perform in cmd prompt, taken from https://cs504070.duonghuuphuc.com/lesson-03/lesson-3a.html: 
+    $ flask shell
+    >>> from hello import db
+    >>> db.create_all()
+    >>> from hello import Role, User
+    >>> admin_role = Role(name='Admin')
+    >>> mod_role = Role(name='Moderator')
+    >>> user_role = Role(name='User')
+    >>> user_john = User(username='john', role=admin_role)
+    >>> user_susan = User(username='susan', role=user_role)
+    >>> user_david = User(username='david', role=mod_role)
+    >>> db.session.add_all([admin_role, mod_role, user_role, user_john, user_susan, user_david])
+    >>> db.session.commit() (important)
+    >>> print(user_david) (for testing purposes)
+    <User 'david'>
+    >>> quit()
 
 
-static and templates are default
-the base.html
+To run the program in Windows:
+    Always run in the cmd prompt (powershell is weird, remember to check for py37 env)
+    $ set FLASK_APP=hello.py (or your main.py)
+    $ set FLASK_DEBUG=1
+    $ flask run
+
+
+SQLAlchemy:
+    Quickstart: https://flask-sqlalchemy.palletsprojects.com/en/2.x/quickstart/
+        important commands from this link (perform in flask shell):
+            User.query.all(): like select * from User
+            db.session.add(): like insert
+            db.session.add_all(): like insert but all
+            db.session.commit(): THIS IS ALWAYS PERFORMED after .add and .delete because it will save into the db, if you don't do it, it doesn't save to the db
+    Full guide: https://flask-sqlalchemy.palletsprojects.com/en/2.x/
+        One-to-many relationship: https://flask-sqlalchemy.palletsprojects.com/en/2.x/models/#one-to-many-relationships
+            this link contain explaination of db.ForeignKey and db.relationship
+        Select, Insert, Delete: https://flask-sqlalchemy.palletsprojects.com/en/2.x/queries/
+            important commands from this links (perform in flask shell)
+                temp = User.query.filter_by(username='peter').first(): find the username peter in User and append to variable temp
+                temp.id: get id from temp
+                temp.email: get email from temp
+                *you should check the field in the table to get the accurate value, it will display error if fields do not exist
+    Flask-WTF validators: https://wtforms.readthedocs.io/en/2.3.x/validators/
+        DataRequired is a validator that check if there is data in the field
+        form.validate_on_submit = is_submit + validate, it is used when submitted and it is used to validate the validators
+    Flask-WTF Fields: https://wtforms.readthedocs.io/en/2.3.x/fields/
+        StringField is a field for string value
+        EmailField is a field that check whether the input is a valid email or not
+        SelectField is like a drop down menu, it has a field called choices which is a (key, value) pair 
+            gender = SelectField("Select:", choices=[(0, "male"), (1, "female"), (2, "none")], validate_choice=True)
+            it can also be performed like this: gender = SelectField("Select:", choices=[], validate_choice=True)
+                choices=[] is a field that will be initialized later
+                form.gender.choices = [(c.id, c.name) for c in Gender.query.all()]
+                    we query from the Gender to get the (id, name) pair
+                    then we map it to form.gender.choices    
+                Original video for solution: https://www.youtube.com/watch?v=75djbw0WGEM (5:18)
+
+
+Delete a record: https://stackoverflow.com/questions/27158573/how-to-delete-a-record-by-id-in-flask-sqlalchemy (better version)
+    remember to "db.session.commit()" or else it will not save changes 
+Delete a record: https://stackoverflow.com/questions/35918605/how-to-delete-a-table-in-sqlalchemy (a good read, not a good solution)
+Btw, to delete the database just delete the file (data.sqlite)
+Email validation using EmailField: https://stackoverflow.com/questions/25324113/email-validation-from-wtform-using-flask
+    EmailField was running completely fine but there was something wrong when using validators Email()
+    => So I opted to use EmailField not validators Email()
+
+
+Query database using flask shell commands and sqlite3 data.sqlite:
+    Using "flask shell" commands:
+        Stackoverflow Q&A: https://stackoverflow.com/questions/66545908/how-to-see-sqlalchemy-database
+            Answer #1: explain that SQLAlchemy is not a db, it is an ORM
+            Answer #2: is the SQLAlchemy Quickstart -> figure out "User.query.all()" command
+    Using "sqlite3 data.sqlite" commands:
+        SQLAlchemy uses sqlite 
+        Video solution: https://www.youtube.com/watch?v=SYG1jQYIxfQ&list=PLXmMXHVSvS-BlLA5beNJojJLlpE0PJgCW&index=1 (5:07)
+            our database's name is "data.sqlite" (it is in the tutorials of dhp)
+            $ sqlite3 data.sqlite:
+                .tables: list all the tables based on the __tablename__
+                .schema: list all the schema of the tables
+        Drop tables: https://www.sqlitetutorial.net/sqlite-drop-table/ (similar commands as SQL)
+        Some other commands to try: https://sqlite.org/cli.html
+    Some small notes:
+        "flask shell" uses the class Name of db.Model
+        "sqlite3 data.sqlite" uses the __tablename__ value
+            sqlite uses the same commands as SQL, but remember to have ';' at the end
+
+
+Many to One sqlalchemy: https://docs.sqlalchemy.org/en/14/orm/basic_relationships.html#many-to-one
+    Check out the "One to Many" article
+    Explain what is and how is db.ForeignKey and db.relationship
+
+                 
+SelectField attemps in explaination (ordered from best to not so good - top to bottom):
+    https://stackoverflow.com/questions/33832940/flask-how-to-populate-select-field-in-wtf-form-when-database-files-is-separate
+    https://stackoverflow.com/questions/23851664/long-sorted-dropdown-list-with-wtforms
+    https://stackoverflow.com/questions/35314102/get-choices-from-a-database-query-in-wtforms-and-flask-sqlalchemy
+
+
+Query tables attemps in explaination (ordered from best to not so good - top to bottom):
+    https://stackoverflow.com/questions/6473925/sqlalchemy-getting-a-list-of-tables
+    https://stackoverflow.com/questions/31197709/get-table-names-in-sqlalchemy
+    https://docs.sqlalchemy.org/en/20/core/metadata.html
+    https://docs-sqlalchemy.readthedocs.io/ko/latest/core/reflection.html
+    https://stackoverflow.com/questions/63724196/displaying-all-tables-with-different-schema-with-sqlalchemys-metadata
+    https://stackoverflow.com/questions/21310549/list-database-tables-with-sqlalchemy
+    https://stackoverflow.com/questions/44193823/get-existing-table-using-sqlalchemy-metadata
+
+
+SQLAlchemy Configuration: https://flask-sqlalchemy.palletsprojects.com/en/2.x/config/#using-custom-metadata-and-naming-conventions
+
+
+Flask-WTForms (contains Django): http://wtforms.simplecodes.com/docs/0.6/ext.html
+
+
+Functions "redirect" and "session" are imported from Flask:
+    $ from flask import Flask, flash, redirect, render_template, session, request, url_for
+
+Folders "static" and "templates" are default folders with default names like that, Flask will automatically looks for them:
+    Folder "templates" contains .html files
+        contains something called base.html which is the base for all other .html files to follow
+            other .html files uses {% extends "base.html" %} to inhert from the base.html
+            if within other .html files, they do not provoke changes, other .html files will use the elements from base.html as default
+    Folder "static" contain static files like: image, css, script,...
+
+
+the reCaptCha saga:
+    Start here, read basic things: https://flask-wtf.readthedocs.io/en/1.0.x/form/#recaptcha
+        Move here, copy and understand the code (all 2 files are needed): 
+            https://github.com/wtforms/flask-wtf/blob/main/examples/recaptcha/app.py
+            https://github.com/wtforms/flask-wtf/blob/main/examples/recaptcha/templates/index.html
+    Watch this to get the public and secret keys: https://www.youtube.com/watch?v=s9gw5ArrEz4
+        Follow by this: https://www.google.com/recaptcha/admin/site/617063496/setup
+        Or this: https://www.google.com/recaptcha/admin/
+    Other article to read (maybe follow):
+        https://www.gitauharrison.com/articles/google-recaptcha-in-flask
+        https://stackoverflow.com/questions/31093964/recaptcha-public-key-config-not-set-with-flask-wtforms (troubleshoot)
+    
+
+Some useful flask extensions:
+    https://www.digitalocean.com/community/tutorials/how-to-use-templates-in-a-flask-application
+    https://marketplace.visualstudio.com/items?itemName=noxiz.jinja-snippets
+
 
 note:
     url_for
     block 
     endif
     endfor
-
-perform these next steps in a cmd    
-$ flask shell
->>> from hello import db
->>> db.create_all()
->>> from hello import Role, User
->>> admin_role = Role(name='Admin')
->>> mod_role = Role(name='Moderator')
->>> user_role = Role(name='User')
->>> user_john = User(username='john', role=admin_role)
->>> user_susan = User(username='susan', role=user_role)
->>> user_david = User(username='david', role=mod_role)
->>> db.session.add_all([admin_role, mod_role, user_role, user_john, user_susan, user_david])
->>> db.session.commit() (important)
->>> print(user_david) 
-<User 'david'>
->>> quit()
-
-to delete the database just del it
-
-redirect and session is from flask
-
-https://docs.sqlalchemy.org/en/14/orm/basic_relationships.html#many-to-one
-
-https://stackoverflow.com/questions/27158573/how-to-delete-a-record-by-id-in-flask-sqlalchemy
-    remember to db.session.commit()
-
-https://stackoverflow.com/questions/66545908/how-to-see-sqlalchemy-database
-https://flask-sqlalchemy.palletsprojects.com/en/2.x/quickstart/
-https://flask-sqlalchemy.palletsprojects.com/en/2.x/
-
-sqlite3 data.sqlite 
-.tables
-.schema
-
-https://www.sqlitetutorial.net/sqlite-drop-table/
-perform in sqlite3 data.sqlite

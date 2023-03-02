@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from 'bootstrap4/form.html' import render_form %}
+
+{% block title %}
+My Flask App - Email
+{% endblock %}
+
+{% block page_content %}
+<div style="margin-top: 25px; margin-bottom: 50px;">
+    <h1>
+        {% if username %}
+        Hello {{ username }}!
+        {% else %}
+        Hello World!
+        {% endif %}
+    </h1>
+    <div style="margin-top: 10px;">
+        {% if not known %}
+        <p>Nice to meet you!</p>
+        {% else %}
+        <p>Glad to see you again!</p>
+        {% endif %}
+    </div>
+
+    <div style="margin-top: 20px;">
+        {{ moment.locale('fr') }}
+        <p>The current local date and time is <strong>{{ moment(current_time).format('LLL') }}</strong>.</p>
+    </div>
+    
+    <form method="POST" action="{{ url_for('add_comment') }}">
+        {{ form.csrf_token }}
+        <p>
+            {{ form.username.label }}<br>
+            {{ form.username(rows=5, cols=40) }}
+        </p>
+        <p>
+            {% for error in form.recaptcha.errors %}
+                {{ error }}
+            {% endfor %}
+            {{ form.recaptcha }}
+        </p>
+        <p>
+            <input type="submit" value="Find username">
+        </p>
+    </form>
+    <div>
+        <img src="{{ url_for('static', filename='foot_img.jpg') }}" alt="window-11">
+    </div>
+</div>
+{% endblock %}
