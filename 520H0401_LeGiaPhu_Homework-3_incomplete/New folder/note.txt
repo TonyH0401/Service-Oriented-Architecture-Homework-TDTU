@@ -30,7 +30,7 @@ $ flask shell
 >>> user_susan = User(username='susan', role=user_role)
 >>> user_david = User(username='david', role=mod_role)
 >>> db.session.add_all([admin_role, mod_role, user_role, user_john, user_susan, user_david])
->>> db.session.commit()
+>>> db.session.commit() (important)
 >>> print(user_david) 
 <User 'david'>
 >>> quit()
@@ -48,3 +48,9 @@ https://stackoverflow.com/questions/66545908/how-to-see-sqlalchemy-database
 https://flask-sqlalchemy.palletsprojects.com/en/2.x/quickstart/
 https://flask-sqlalchemy.palletsprojects.com/en/2.x/
 
+sqlite3 data.sqlite 
+.tables
+.schema
+
+https://www.sqlitetutorial.net/sqlite-drop-table/
+perform in sqlite3 data.sqlite

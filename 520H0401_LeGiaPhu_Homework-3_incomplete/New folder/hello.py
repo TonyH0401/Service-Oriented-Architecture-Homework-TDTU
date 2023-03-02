@@ -47,26 +47,26 @@ class User(db.Model):
         return '<User %r>' % self.username
 
 
-# class Account(db.Model):
-#     __tablename__ = 'accounts'
-#     id = db.Column(db.Integer, primary_key=True)
-#     name = db.Column(db.String(64), unique=True, index=True)
-#     email = db.Column(db.String(64))
-#     password = db.Column(db.String(64))
-#     dob = db.Column(db.String(64))
-#     nationality = db.Column(db.String(64))
-#     gender_id = db.Column(db.Integer, db.ForeignKey('genders.id'))
+class Account(db.Model):
+    __tablename__ = 'accounts'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True, index=True)
+    email = db.Column(db.String(64), unique=True)
+    password = db.Column(db.String(64))
+    dob = db.Column(db.String(64))
+    nationality = db.Column(db.String(64))
+    gender_id = db.Column(db.Integer, db.ForeignKey('genders.id'))
 
-#     def __repr__(self):
-#         return '<Account %r>' % self.name
-# class Gender(db.Model):
-#     __tablename__ = 'genders'
-#     id = db.Column(db.Integer, primary_key=True)
-#     name = db.Column(db.String(64), unique=True, index=True)
-#     accounts = db.relationship('Account', backref='gender')
+    def __repr__(self):
+        return '<Account %r>' % self.name
+class Gender(db.Model):
+    __tablename__ = 'genders'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True, index=True)
+    accounts = db.relationship('Account', backref='gender')
 
-#     def __repr__(self):
-#         return '<Gender %r>' % self.name
+    def __repr__(self):
+        return '<Gender %r>' % self.name
 
 class NameForm2(FlaskForm):
     name = StringField('What is your name?', validators=[DataRequired()])
@@ -75,8 +75,9 @@ class NameForm2(FlaskForm):
     password = PasswordField("Input your password:", validators=[DataRequired()])
     dob = DateField("Input your Date of Birth", validators=[DataRequired()])
     nationality = StringField("What is your nationality?", validators=[DataRequired()])
-    gender = SelectField("Select:", choices=[(0, "male"), (1, "female"), (2, "none")], validate_choice=True)
-      
+    # gender = SelectField("Select:", choices=[(0, "male"), (1, "female"), (2, "none")], validate_choice=True)
+    gender = SelectField("Select:", choices=[], validate_choice=True)
+
     submit = SubmitField('Submit')
 
 
@@ -140,9 +141,10 @@ def index():
         if session.get('name') is not None and session.get('name') != form.name.data:
             flash('Looks like you have changed your name!')
         session['name'] = form.name.data
-        # finally redirect the page to index by provoke the url_for('index')
+        # finally redirect to the index page by calling function route index by provoke the url_for('index')
         return redirect(url_for('index'))
     # information validate failed then render_template (the form is empty of course)
+    # or GET methods will return render_templates
     return render_template('index.html', form=form, name=session.get('name'), known=session.get('known'), current_time=datetime.utcnow())
 
 
@@ -172,14 +174,54 @@ def getdate(region_code, city_code):
 
 @app.route("/account", methods=["GET", "POST"])
 def account():
+    name = None
+    email = None
+    password = None
+    dob = None
+    nationality = None
+    gender = None
+
     form = NameForm2()
-    name = form.name.data
-    email = form.email.data
-    password = form.password.data
-    dob = form.dob.data
-    nationality = form.nationality.data
-    gender = form.gender.data
-    print(name, email, password, dob, nationality, gender)
+    # remember this?, gender = SelectField("Select:", choices=[], validate_choice=True)
+    form.gender.choices = [(c.id, c.name) for c in Gender.query.all()]
+    
+    if form.validate_on_submit():
+        name = form.name.data
+        email = form.email.data
+        password = form.password.data
+        dob = form.dob.data
+        nationality = form.nationality.data
+        gender = form.gender.data
+        if len(password) < 6:
+            flash('Password is not long enough!')
+            return render_template('register.html', form=form, current_time=datetime.utcnow())
+        
+        current_account = Account.query.filter_by(email=form.email.data).first()
+        if current_account is None:
+            print("empty account")
+            current_account = Account(name=name, email=email, password=password, dob=dob, nationality=nationality, gender_id=gender)
+            # db.session.commit()
+
+            current_user = User.query.filter_by(username=form.name.data).first()
+            if current_user is None:
+                user_role = Role(name='User')
+                current_user = User(username=form.name.data, role_id=1)
+                
+                db.session.add(current_account)
+                db.session.add(current_user)
+                db.session.commit()
+                session['known'] = False
+            else:
+                flash('Looks like you existed!')
+                session['known'] = True
+        else:
+            print("existed")
+            flash('Looks like you existed!')
+            session['known'] = True
+        session['name'] = form.name.data
+        return redirect(url_for('index'))
+    # print(name, email, password, dob, nationality, gender)
+    # GET methods will return render_templates
     return render_template('register.html', form=form, current_time=datetime.utcnow())
 
 # ------------------------------------------------------------------------------------------------
