@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from 'bootstrap4/form.html' import render_form %}
+
+{% block title %}
+My Flask App - Email
+{% endblock %}
+
+{% block page_content %}
+<div style="margin-top: 25px; margin-bottom: 50px;">
+    <!-- <h1>Hello World!</h1> -->
+
+    <h1>
+        {% if name %}
+        Hello {{ name }}!
+        {% else %}
+        Hello World!
+        {% endif %}
+
+    </h1>
+
+    <div style="margin-top: 10px;">
+        {% if not known %}
+        <p>Nice to meet you!</p>
+        {% else %}
+        <p>Glad to see you again!</p>
+        {% endif %}
+    </div>
+
+    <div style="margin-top: 50px;">
+        {{ render_form(form) }}
+    </div>
+
+
+    <!-- the link will be localhost:5000/static/favicon.png -->
+    <div style="margin-top: 50px;">
+        <a href="{{ url_for('static', filename='favicon.png') }}">Click this for picture using url_for and static</a>
+    </div>
+
+    <div style="margin-top: 50px;">
+        {{ moment.locale('fr') }}
+        <p>The current local date and time is <strong>{{ moment(current_time).format('LLL') }}</strong>.</p>
+        <p>That was {{ moment(current_time).fromNow(refresh=True) }}.</p>
+    </div>
+</div>
+{% endblock %}
+<!-- <div style="margin-top: 50px;">
+    <p>The current local date and time is <strong>{{ moment(curent_time).format('LLL') }}</strong></p>
+</div> -->
+<!-- <p>That was {{ moment(curent_time).fromNow(refresh=True) }}</p> -->
