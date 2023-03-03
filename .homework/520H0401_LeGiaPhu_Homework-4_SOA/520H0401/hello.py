@@ -1,0 +1,329 @@
+from datetime import datetime
+from wsgiref.validate import validator
+from send_email import send_email_v1
+from flask import Flask, flash, redirect, render_template, session, request, url_for
+from flask_bootstrap import Bootstrap4
+from flask_moment import Moment
+import pytz
+from flask_wtf import FlaskForm, RecaptchaField
+from wtforms import StringField, SubmitField, EmailField, DateField, SelectField, PasswordField, RadioField, TextAreaField
+from wtforms.validators import DataRequired
+import os
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+
+
+basedir = os.path.abspath(os.path.dirname(__file__))
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'hard to guess string'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'data.sqlite')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+bootstrap = Bootstrap4(app)
+moment = Moment(app)
+
+
+# ex4
+RECAPTCHA_PUBLIC_KEY = "6LdIpMckAAAAACigFCbhjZdQHiZjMJkYLmJl7WVL"
+RECAPTCHA_PRIVATE_KEY = "6LdIpMckAAAAAAoct_UBlrXGgBoqedANVWCpWFdq"
+app.config['RECAPTCHA_USE_SSL'] = False
+app.config['RECAPTCHA_PUBLIC_KEY'] = "6LdIpMckAAAAACigFCbhjZdQHiZjMJkYLmJl7WVL"
+app.config['RECAPTCHA_PRIVATE_KEY'] = "6LdIpMckAAAAAAoct_UBlrXGgBoqedANVWCpWFdq"
+app.config['RECAPTCHA_OPTIONS'] = {'theme': 'white'}
+
+
+class Role(db.Model):
+    __tablename__ = 'roles'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True)
+    # check it out, this exists in a different table as a foreign key
+    # should name the variable the same as the __tablename__ of the other table
+    # 1st parameter is the class name of the child (ie: User)
+    # 2nd parameter is the class name of the parent (ie: role)
+    users = db.relationship('User', backref='role')
+
+    # this is what will be displayed in the flask shell with the command Role.query.all()
+    def __repr__(self):
+        return '<Role %r>' % self.name
+
+
+class User(db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(64), unique=True, index=True)
+    # check it out, a foreign key
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
+
+    def __repr__(self):
+        return '<User %r>' % self.username
+
+
+# ex2
+class Account(db.Model):
+    __tablename__ = 'accounts'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True, index=True)
+    email = db.Column(db.String(64), unique=True)
+    password = db.Column(db.String(64))
+    dob = db.Column(db.String(64))
+    nationality = db.Column(db.String(64))
+    gender_id = db.Column(db.Integer, db.ForeignKey('genders.id'))
+
+    def __repr__(self):
+        return '<Account %r>' % self.name
+class Gender(db.Model):
+    __tablename__ = 'genders'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True, index=True)
+    accounts = db.relationship('Account', backref='gender')
+
+    def __repr__(self):
+        return '<Gender %r>' % self.name
+class NameForm2(FlaskForm):
+    name = StringField('What is your name?', validators=[DataRequired()])
+    # the validators Email() does not work, but EmailField does
+    email = EmailField('What is your email?', validators=[DataRequired()])
+    password = PasswordField("Input your password:", validators=[DataRequired()])
+    dob = DateField("Input your Date of Birth", validators=[DataRequired()])
+    nationality = StringField("What is your nationality?", validators=[DataRequired()])
+    # gender = SelectField("Select:", choices=[(0, "male"), (1, "female"), (2, "none")], validate_choice=True)
+    gender = SelectField("Select:", choices=[], validate_choice=True)
+    tos = RadioField("Accept terms of service: ", choices=[(0, "Accept")], validators=[DataRequired()])
+    
+    submit = SubmitField('Submit')
+
+
+# inhert the FlaskForm, in the html file you just need to call {{ render_form(form) }}
+# it will call this NameForm cause (1) it was inhert, (2) the "/" route return the NameForm
+class NameForm(FlaskForm):
+    # define what field is needed in the form
+    # validators=[DataRequired()] is to have data b4 submit, will be checked by form.validate_on_submit()
+    # there are also other validators: Email, Length,... check the slide for more
+    name = StringField('What is your name?', validators=[DataRequired()])
+    # you can add more field to this
+    # petname = StringField('What is your petname?', validators=[DataRequired()])
+    # the submit button
+    submit = SubmitField('Submit')
+
+
+# ex4
+class SignupForm(FlaskForm):
+    username  = StringField("What is your name?", validators=[DataRequired()])
+    recaptcha = RecaptchaField()
+# the flow is: dir /recapchaindex is 1st (the form is always None) => create the form = SignupForm()
+# username gets from the session.get("username"), the session exists always and throughout the session website
+# after that, it render_template with all the values: form, username,...
+# when you use method post in the .html file, it call the function route add_comment
+# in def add_comment it does the normal stuff from previous exercise, but with session username value
+# after that, it redirect url_for to def recapchaindex
+# and the cycle begin again but now with a username value from the session
+# the recapcha part is defined in the SignupForm and it is called in the .html file as form.recapcha
+@app.route("/recapchaindex")
+def recapchaindex(form=None):
+    if form is None:
+        form = SignupForm()
+    username = session.get("username")
+    known = session.get('known')
+    return render_template("recapchaindex.html", form=form, username=username, known=known, current_time=datetime.utcnow())
+@app.route("/add/", methods=("POST",))
+def add_comment():
+    form = SignupForm()
+    if form.validate_on_submit():
+        current_user = User.query.filter_by(username=form.username.data).first()
+        if current_user is None:
+            session["known"] = False
+            session["username"] = None
+            flash("You are new!?")
+        else:
+            username = form.username.data
+            session['known'] = True
+            session["username"] = username
+        return redirect(url_for("recapchaindex"))
+    return recapchaindex(form)
+
+
+# the "/" route has 2 http methods "get" and "post" (it is "get" by default)
+@app.route("/", methods=['GET', 'POST'])
+def index():
+    # return "<h1>Hello World</h1>"
+    # current_time = datetime.utcnow()
+    # return render_template("index.html", current_time=current_time)
+
+    # name = None
+    # petname = None
+    # # create new instance of the form via call NameForm()
+    # form = NameForm()
+    # # remember validators=[DataRequired()], this is were they linked up
+    # if form.validate_on_submit():
+    #     # need to have defined name variable in the NameForm first
+    #     # append the data from form.name.data to name variable
+    #     name = form.name.data
+    #     # remember flash in nodejs, it retains the value of this field after submit, this is the same
+    #     # technically, you dont need this, it will automatically append to that field in the form
+    #     form.name.data = name
+    #     # you can also do this, it will erase after submit
+    #     # form.name.data = None
+    #     petname = form.petname.data
+    #     form.petname.name = None
+    # # at last, return the form, why?, remember the GET method, it will load (with and without data)
+    # return render_template('index.html', form=form, name=name, petname=petname, current_time=datetime.utcnow())
+
+    form = NameForm()
+    # validate information 1st
+    if form.validate_on_submit():
+        # get the current user from the field form
+        current_user = User.query.filter_by(username=form.name.data).first()
+        # if user does not exist, add them to db
+        if current_user is None:
+            print("empty")
+            current_user = User(username=form.name.data)
+            db.session.add(current_user)
+            db.session.commit()
+            # this is a session variable, it goes all the way and throughout the website
+            session['known'] = False
+        # if user exist in db
+        else:
+            print("existed")
+            session['known'] = True
+        # implementation of flash message
+        # in the base.html add a jinja template as well
+        if session.get('name') is not None and session.get('name') != form.name.data:
+            flash('Looks like you have changed your name!')
+        session['name'] = form.name.data
+        # finally redirect to the index page by calling function route index by provoke the url_for('index')
+        return redirect(url_for('index'))
+    # information validate failed then render_template (the form is empty of course)
+    # or GET methods will return render_templates
+    return render_template('index.html', form=form, name=session.get('name'), known=session.get('known'), current_time=datetime.utcnow())
+
+
+
+@app.route("/user/<name>")
+def user(name):
+    # return "<h1>Hello, {}!<3</h1>".format(name)
+    page = request.args.get('page')
+    number = request.args.get('number')
+    print("Page is: ", page, " - Number is: ", number)
+    return render_template("user.html", name=name, page=page, number=number)
+
+
+@app.route('/get-date-time/<string:region_code>/<string:city_code>')
+def getdate(region_code, city_code):
+    # current_time = datetime.utcnow()
+    # print(current_time)
+    time_string = region_code.title() + "/" + city_code.title()
+    if time_string in pytz.all_timezones:
+        current_time = datetime.now(pytz.timezone(time_string))
+        print(True)
+    else:
+        current_time = datetime.utcnow()
+        print(False)
+    return render_template('ex4.html', number=4, current_time=current_time)
+
+
+@app.route("/account/register", methods=["GET", "POST"])
+def account_register():
+    name = None
+    email = None
+    password = None
+    dob = None
+    nationality = None
+    gender = None
+
+    form = NameForm2()
+    # remember this?, gender = SelectField("Select:", choices=[], validate_choice=True)
+    form.gender.choices = [(c.id, c.name) for c in Gender.query.all()]
+    
+    if form.validate_on_submit():
+        name = form.name.data
+        email = form.email.data
+        password = form.password.data
+        dob = form.dob.data
+        nationality = form.nationality.data
+        gender = form.gender.data
+        if len(password) < 6:
+            flash('Password is not long enough!')
+            return render_template('register.html', form=form, current_time=datetime.utcnow())
+        
+        current_account = Account.query.filter_by(email=form.email.data).first()
+        if current_account is None:
+            print("empty account")
+            current_account = Account(name=name, email=email, password=password, dob=dob, nationality=nationality, gender_id=gender)
+            # db.session.commit()
+
+            current_user = User.query.filter_by(username=form.name.data).first()
+            if current_user is None:
+                user_role = Role(name='User')
+                current_user = User(username=form.name.data, role_id=1)
+                
+                db.session.add(current_account)
+                db.session.add(current_user)
+                db.session.commit()
+                flash('Success!')
+                session['known'] = False
+            else:
+                flash('Looks like your name existed!')
+                session['known'] = True
+        else:
+            print("existed")
+            flash('Looks like your email existed!')
+            session['known'] = True
+        session['name'] = form.name.data
+        return redirect(url_for('index'))
+    # GET methods will return render_templates
+    return render_template('register.html', form=form, current_time=datetime.utcnow())
+
+
+# ex1, ex2
+class EmailForm(FlaskForm):
+    emailReceiver = EmailField('Receipient Email Address', validators=[DataRequired()])
+    emailSubject = StringField('What is the subject?', validators=[DataRequired()])
+    emailContent = TextAreaField('What is the content?', validators=[DataRequired()])
+    submit = SubmitField('Send')
+@app.route('/email-sender/', methods=["GET", "POST"])
+def send_email():
+    form = EmailForm()
+    # the POST method will run this
+    if form.validate_on_submit():
+        receiver = form.emailReceiver.data
+        subject = form.emailSubject.data
+        content = form.emailContent.data + "<br>" + str(datetime.utcnow())
+        flag = send_email_v1(str(receiver), str(subject), str(content))
+        if flag:
+            flash("Message has been sent successfully!")
+        else:
+            flash("There is an error!")
+        return redirect(url_for('send_email'))
+    # the GET method will run this
+    return render_template('email.html', form=form, current_time=datetime.utcnow())
+
+
+# follow the tutorials -> get credentials_desktop_apps.json -> add it in the directory
+# token.json is generated automatically once you have login and allow trust to the software
+# this allows you to send email with the sender being your email which is located in token.json (once you've login)
+# token.json needed to be generated once only, it will auto update and you can even logout of your Gmail
+# if token.json is deleted the process need to be repeated again => if anything happens, just delete the token.json
+# token.json should be deleted when submit
+@app.route('/send-email/<recipient>')
+def test_send_email_v1(recipient=None):
+    if recipient is None:
+        recipient = 'phugiale2912@gmail.com'
+    flag = send_email_v1(str(recipient))
+    if flag:
+        return "Message has been sent successfully"
+    else:
+        return "There is an error occured"
+
+
+# ------------------------------------------------------------------------------------------------
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template("404.html"), 404
+
+
+@app.errorhandler(505)
+def internal_server_error(e):
+    return render_template("505.html"), 505
+

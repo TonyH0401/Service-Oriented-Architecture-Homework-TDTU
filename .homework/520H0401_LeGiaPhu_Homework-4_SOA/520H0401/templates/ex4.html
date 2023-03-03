@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}
+Exercise - {{ number }}
+{% endblock %}
+
+{% block page_content %}
+<div style="margin-top: 20px; margin-bottom: 50px;">
+    <h1>Hello, Exercise {{ number }}</h1>
+    <p>The current local date and time is <strong>{{ current_time }}</strong>.</p>
+    <p>The current local date and time is <strong>{{ moment(current_time).format('MMMM Do YYYY, h:mm:ss a') }}</strong>.</p>
+    <p>The current local date and time is <strong>{{ moment(current_time).format('LLLL') }}</strong>.</p>
+    <p>The current local date and time is <strong>{{ moment(current_time).format() }}</strong>.</p>
+</div>
+
+{% endblock %}
+
+    <!-- this is not allowed because there are no value called name that the url_for can send to route function user -->
+    <!-- <a href="{{ url_for('user', number='10') }}">Check the query</a> --> 
